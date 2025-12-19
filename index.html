@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whiteboard Collaboratif - Salle de Classe</title>
+<style>
+  @font-face {
+    font-family: 'CC Wild Words Roman';
+    src: url('fonts/CCWildWordsRoman.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
+  
+  * { box-sizing: border-box; }
+  
+  body { 
+    margin: 0; 
+    overflow: hidden; 
+    background: linear-gradient(180deg, #f7fbff, #eef6ff); 
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  
+  /* ============= MODAL DE CONNEXION ============= */
+  #loginModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+  }
+  
+  .login-container {
+    background: white;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 480px;
+    width: 90%;
+    animation: slideIn 0.4s ease-out;
+  }
+  
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .login-container h1 {
+    margin: 0 0 10px 0;
+    font-size: 28px;
+    color: #1a202c;
+    text-align: center;
+  }
+  
+  .login-container p {
+    margin: 0 0 30px 0;
+    color: #718096;
+    text-align: center;
+  }
+  
+  .login-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+  }
+  
+  .login-tab {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: #f7fafc;
+    color: #4a5568;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  
+  .login-tab.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .login-form {
+    display: none;
+  }
+  
+  .login-form.active {
+    display: block;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #2d3748;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  
+  .form-group input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 15px;
+    transition: all 0.3s;
+  }
+  
+  .form-group input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  .form-btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  
+  .form-btn:hover {
+    transform: translateY(-2px);
+  }
+  
+  .code-display {
+    background: #f7fafc;
+    padding: 16px;
+    border-radius: 10px;
+    text-align: center;
+    margin: 20px 0;
+  }
+  
+  .code-display .code {
+    font-size: 32px;
+    font-weight: 700;
+    color: #667eea;
+    letter-spacing: 4px;
+    font-family: 'Courier New', monospace;
+  }
+  
+  .code-display small {
+    display: block;
+    margin-top: 8px;
+    color: #718096;
+  }
+  
+  /* ============= TOOLBAR ============= */
+  #toolbar {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(20, 30, 60, 0.15);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  
+  .tool-group {
+    display: flex;
+    gap: 6px;
+    padding-right: 8px;
+    border-right: 1px solid #e4e9f2;
+  }
+  
+  .tool-group:last-child {
+    border-right: none;
+    padding-right: 0;
+  }
+  
+  #toolbar input, #toolbar select, #toolbar button {
+    height: 36px;
+    border-radius: 7px;
+    border: 1px solid #e4e9f2;
+    padding: 6px 12px;
+    background: #fff;
+    color: #111;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+  
+  #toolbar button {
+    cursor: pointer;
+    font-weight: 500;
+  }
+  
+  #toolbar button:hover:not(:disabled) {
+    box-shadow: 0 2px 8px rgba(20, 30, 60, 0.12);
+    border-color: #3b82f6;
+  }
+  
+  #toolbar button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  #toolbar input[type="range"] {
+    width: 110px;
+    cursor: pointer;
+  }
+  
+  #toolbar input[type="color"] {
+    width: 50px;
+    height: 36px;
+    padding: 2px;
+    cursor: pointer;
+  }
+  
+  /* ============= PANNEAU INFO CLASSE ============= */
+  #classInfo {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(20, 30, 60, 0.15);
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+    min-width: 280px;
+  }
+  
+  .class-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e4e9f2;
+  }
+  
+  .class-code {
+    font-size: 20px;
+    font-weight: 700;
+    color: #667eea;
+    font-family: 'Courier New', monospace;
+  }
+  
+  .role-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  
+  .role-admin {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  
+  .role-student {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+  
+  .status-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+    font-size: 13px;
+    color: #4a5568;
+  }
+  
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  
+  .status-connected { background: #10b981; }
+  .status-connecting { background: #f59e0b; }
+  .status-disconnected { background: #ef4444; }
+  .status-locked { background: #ef4444; }
+  .status-unlocked { background: #10b981; }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  .info-section {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e4e9f2;
+  }
+  
+  .info-title {
+    font-size: 12px;
+    color: #718096;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  
+  /* ============= CONTRÔLES ADMIN ============= */
+  .admin-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .admin-btn {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .btn-lock {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+  
+  .btn-unlock {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  
+  .btn-clear-all {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  
+  .admin-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* ============= LISTE ÉTUDIANTS ============= */
+  #studentsList {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .student-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    margin: 4px 0;
+    background: #f7fafc;
+    border-radius: 7px;
+  }
+  
+  .student-item.raised-hand {
+    background: #fef3c7;
+    animation: wiggle 0.5s ease-in-out;
+  }
+  
+  @keyframes wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-5deg); }
+    75% { transform: rotate(5deg); }
+  }
+  
+  .student-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #2d3748;
+  }
+  
+  .hand-icon {
+    font-size: 20px;
+    animation: wave 0.6s ease-in-out infinite;
+  }
+  
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(20deg); }
+    75% { transform: rotate(-20deg); }
+  }
+  
+  /* ============= BOUTON LEVER LA MAIN ============= */
+  #raiseHandBtn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);
+    transition: all 0.3s;
+    z-index: 1000;
+  }
+  
+  #raiseHandBtn:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(245, 158, 11, 0.5);
+  }
+  
+  #raiseHandBtn.active {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    animation: bounce 0.6s ease-in-out infinite;
+  }
+  
+  @keyframes bounce {
+    0%, 100% { transform: translateY(-4px); }
+    50% { transform: translateY(-8px); }
+  }
+  
+  /* ============= LOCKED OVERLAY ============= */
+  #lockedOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(4px);
+  }
+  
+  #lockedOverlay.active {
+    display: flex;
+  }
+  
+  .locked-message {
+    background: white;
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+  
+  .locked-message .icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+  }
+  
+  .locked-message h2 {
+    margin: 0 0 10px 0;
+    font-size: 24px;
+    color: #1a202c;
+  }
+  
+  .locked-message p {
+    margin: 0;
+    color: #718096;
+  }
+  
+  canvas {
+    touch-action: none;
+    display: block;
+    cursor: crosshair;
+  }
+  
+  canvas.eraser-cursor {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="black" stroke-width="2"/></svg>') 12 12, auto;
+  }
+  
+  canvas.locked {
+    cursor: not-allowed;
+  }
+  
+  .toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 10000;
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+</style>
+</head>
+<body>
+  <!-- Modal de connexion -->
+  <div id="loginModal">
+    <div class="login-container">
+      <h1>🎨 Whiteboard Classe</h1>
+      <p>Créez ou rejoignez une salle de classe</p>
+      
+      <div class="login-tabs">
+        <button class="login-tab active" data-tab="create">Créer une classe</button>
+        <button class="login-tab" data-tab="join">Rejoindre</button>
+      </div>
+      
+      <!-- Formulaire Créer -->
+      <div id="createForm" class="login-form active">
+        <div class="form-group">
+          <label>👤 Votre nom</label>
+          <input type="text" id="createName" placeholder="Ex: M. Dupont" required>
+        </div>
+        <div class="form-group">
+          <label>📚 Nom de la classe</label>
+          <input type="text" id="className" placeholder="Ex: Mathématiques 3ème A" required>
+        </div>
+        <button class="form-btn" onclick="createClass()">Créer la classe</button>
+      </div>
+      
+      <!-- Formulaire Rejoindre -->
+      <div id="joinForm" class="login-form">
+        <div class="form-group">
+          <label>👤 Votre nom</label>
+          <input type="text" id="joinName" placeholder="Ex: Marie Martin" required>
+        </div>
+        <div class="form-group">
+          <label>🔑 Code de la classe</label>
+          <input type="text" id="classCode" placeholder="Ex: ABC123" maxlength="6" style="text-transform: uppercase;" required>
+        </div>
+        <button class="form-btn" onclick="joinClass()">Rejoindre</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay verrouillé -->
+  <div id="lockedOverlay">
+    <div class="locked-message">
+      <div class="icon">🔒</div>
+      <h2>Tableau verrouillé</h2>
+      <p>Le professeur a verrouillé le tableau.<br>Vous pouvez lever la main pour demander la parole.</p>
+    </div>
+  </div>
+
+  <!-- Informations de classe -->
+  <div id="classInfo" style="display: none;">
+    <div class="class-header">
+      <div>
+        <div class="class-code" id="displayClassCode">ABC123</div>
+        <div style="font-size: 12px; color: #718096;" id="displayClassName">Ma Classe</div>
+      </div>
+      <div class="role-badge role-student" id="roleBadge">Élève</div>
+    </div>
+    
+    <div class="status-line">
+      <div class="status-dot status-connected" id="connectionDot"></div>
+      <span id="connectionText">Connecté</span>
+    </div>
+    
+    <div class="status-line" id="lockStatus">
+      <div class="status-dot status-unlocked" id="lockDot"></div>
+      <span id="lockText">Tableau déverrouillé</span>
+    </div>
+    
+    <!-- Contrôles admin -->
+    <div class="info-section" id="adminControls" style="display: none;">
+      <div class="info-title">CONTRÔLES PROFESSEUR</div>
+      <div class="admin-controls">
+        <button class="admin-btn btn-unlock" id="toggleLockBtn" onclick="toggleLock()">
+          <span id="lockBtnIcon">🔓</span>
+          <span id="lockBtnText">Verrouiller tableau</span>
+        </button>
+        <button class="admin-btn btn-clear-all" onclick="clearAllHands()">
+          ✋ Baisser toutes les mains
+        </button>
+      </div>
+    </div>
+    
+    <!-- Liste étudiants -->
+    <div class="info-section">
+      <div class="info-title">
+        PARTICIPANTS (<span id="studentCount">0</span>)
+      </div>
+      <div id="studentsList"></div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div id="toolbar" style="display: none;">
+    <div class="tool-group">
+      <input type="color" id="colorPicker" value="#000000" title="Couleur">
+      <input type="range" id="brushSize" min="1" max="50" value="4" title="Taille">
+      <label style="font-size: 12px; color: #666; margin-left: -4px;">
+        <span id="sizeValue">4</span>px
+      </label>
+    </div>
+    
+    <div class="tool-group">
+      <input type="range" id="opacityRange" min="5" max="100" value="100" title="Opacité">
+      <label style="font-size: 12px; color: #666; margin-left: -4px;">
+        <span id="opacityValue">100</span>%
+      </label>
+    </div>
+    
+    <div class="tool-group">
+      <select id="toolSelect" title="Outil">
+        <option value="pen">✏️ Stylo</option>
+        <option value="highlighter">🖍️ Surligneur</option>
+        <option value="eraser">🧹 Gomme</option>
+        <option value="text">📝 Texte</option>
+      </select>
+      
+      <select id="multibrushSelect" title="Multi-pinceau">
+        <option value="1">1 pinceau</option>
+        <option value="3">3 pinceaux</option>
+        <option value="5">5 pinceaux</option>
+      </select>
+    </div>
+    
+    <div class="tool-group" id="textControls" style="display: none;">
+      <input type="text" id="textInput" placeholder="Texte..." style="width: 140px;">
+      <input type="number" id="fontSize" min="8" max="240" value="48" style="width: 65px;" title="Taille police">
+    </div>
+    
+    <div class="tool-group">
+      <button id="undoBtn" title="Annuler (Ctrl+Z)">↶ Undo</button>
+      <button id="redoBtn" title="Refaire (Ctrl+Y)">↷ Redo</button>
+    </div>
+    
+    <div class="tool-group">
+      <button id="clearBtn" title="Tout effacer">🗑️ Effacer</button>
+      <button id="saveBtn" title="Télécharger">💾 Sauver</button>
+    </div>
+  </div>
+
+  <!-- Bouton lever la main (étudiants uniquement) -->
+  <button id="raiseHandBtn" style="display: none;" onclick="toggleRaiseHand()">✋</button>
+
+  <canvas id="board"></canvas>
+
+<script>
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+const API_URL = 'http://localhost:3000';
+const clientId = Math.random().toString(36).substr(2, 9);
+
+let classCode = '';
+let className = '';
+let userName = '';
+let isAdmin = false;
+let isLocked = false;
+let handRaised = false;
+
+let drawing = false;
+let color = '#000000';
+let size = 4;
+let multibrush = 1;
+let tool = 'pen';
+let opacity = 1;
+let lastX = 0, lastY = 0;
+
+const undoStack = [];
+const redoStack = [];
+let pollInterval = null;
+let lastModified = 0;
+
+// ============================================================================
+// CANVAS SETUP
+// ============================================================================
+const canvas = document.getElementById("board");
+const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+function resizeCanvas() {
+  const tempData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  ctx.putImageData(tempData, 0, 0);
+}
+
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ============================================================================
+// LOGIN
+// ============================================================================
+document.querySelectorAll('.login-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.login-form').forEach(f => f.classList.remove('active'));
+    
+    tab.classList.add('active');
+    const tabName = tab.dataset.tab;
+    document.getElementById(tabName + 'Form').classList.add('active');
+  });
+});
+
+async function createClass() {
+  const name = document.getElementById('createName').value.trim();
+  const clsName = document.getElementById('className').value.trim();
+  
+  if (!name || !clsName) {
+    showToast('⚠️ Veuillez remplir tous les champs');
+    return;
+  }
+  
+  userName = name;
+  className = clsName;
+  classCode = Math.random().toString(36).substr(2, 6).toUpperCase();
+  isAdmin = true;
+  
+  try {
+    const response = await fetch(`${API_URL}/api/classroom/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        classCode,
+        className,
+        adminName: userName,
+        clientId
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      document.getElementById('loginModal').style.display = 'none';
+      document.getElementById('toolbar').style.display = 'flex';
+      document.getElementById('classInfo').style.display = 'block';
+      document.getElementById('adminControls').style.display = 'block';
+      document.getElementById('roleBadge').textContent = 'Professeur';
+      document.getElementById('roleBadge').className = 'role-badge role-admin';
+      
+      updateClassInfo();
+      startPolling();
+      saveState(undoStack);
+      
+      showToast('✅ Classe créée ! Code: ' + classCode);
+    }
+  } catch (error) {
+    console.error('Erreur:', error);
+    showToast('❌ Erreur de connexion');
+  }
+}
+
+async function joinClass() {
+  const name = document.getElementById('joinName').value.trim();
+  const code = document.getElementById('classCode').value.trim().toUpperCase();
+  
+  if (!name || !code) {
+    showToast('⚠️ Veuillez remplir tous les champs');
+    return;
+  }
+  
+  userName = name;
+  classCode = code;
+  isAdmin = false;
+  
+  try {
+    const response = await fetch(`${API_URL}/api/classroom/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        classCode: code,
+        userName: name,
+        clientId
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.error) {
+      showToast('❌ ' + data.error);
+      return;
+    }
+    
+    if (data.success) {
+      className = data.className;
+      isLocked = data.isLocked;
+      
+      document.getElementById('loginModal').style.display = 'none';
+      document.getElementById('toolbar').style.display = 'flex';
+      document.getElementById('classInfo').style.display = 'block';
+      document.getElementById('raiseHandBtn').style.display = 'block';
+      document.getElementById('roleBadge').textContent = 'Élève';
+      document.getElementById('roleBadge').className = 'role-badge role-student';
+      
+      // Charger l'état du canvas
+      if (data.canvasState) {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0);
+        };
+        img.src = data.canvasState;
+      }
+      
+      updateClassInfo();
+      updateLockStatus();
+      startPolling();
+      
+      showToast('✅ Classe rejointe !');
+    }
+  } catch (error) {
+    console.error('Erreur:', error);
+    showToast('❌ Erreur de connexion');
+  }
+}
+
+function updateClassInfo() {
+  document.getElementById('displayClassCode').textContent = classCode;
+  document.getElementById('displayClassName').textContent = className;
+}
+
+// ============================================================================
+// POLLING
+// ============================================================================
+function startPolling() {
+  pollInterval = setInterval(pollState, 1000);
+  pollState();
+}
+
+async function pollState() {
+  if (!classCode) return;
+  
+  try {
+    const response = await fetch(`${API_URL}/api/classroom/${classCode}`);
+    const data = await response.json();
+    
+    if (data.error) return;
+    
+    // Mettre à jour l'état
+    if (!isAdmin) {
+      if (data.isLocked !== isLocked) {
+        isLocked = data.isLocked;
+        updateLockStatus();
+      }
+    }
+    
+    // Mettre à jour les étudiants
+    updateStudentsList(data.students);
+    
+    // Dessiner les nouveaux traits
+    if (data.lastModified > lastModified) {
+      lastModified = data.lastModified;
+      
+      if (data.drawBuffer && data.drawBuffer.length > 0) {
+        data.drawBuffer.forEach(d => {
+          if (d.clientId !== clientId) {
+            drawLine(d.x0, d.y0, d.x1, d.y1, d.color, d.size, d.tool);
+          }
+        });
+      }
+    }
+    
+  } catch (error) {
+    console.error('Erreur polling:', error);
+  }
+}
+
+// ============================================================================
+// STUDENTS
+// ============================================================================
+function updateStudentsList(students) {
+  const list = document.getElementById('studentsList');
+  const count = document.getElementById('studentCount');
+  
+  list.innerHTML = '';
+  
+  if (!students || students.length ===
