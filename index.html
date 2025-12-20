@@ -894,4 +894,414 @@ function updateStudentsList(students) {
   
   list.innerHTML = '';
   
-  if (!students || students.length ===
+  if (!students || students.length === 0) {
+    list.innerHTML = '<div style="text-align: center; color: #718096; padding: 12px;">Aucun étudiant</div>';
+    count.textContent = '0';
+    return;
+  }
+  
+  count.textContent = students.length;
+  
+  students.forEach(student => {
+    const div = document.createElement('div');
+    div.className = 'student-item' + (student.handRaised ? ' raised-hand' : '');
+    
+    div.innerHTML = `
+      <div class="student-name">${student.userName} ${student.isAdmin ? '(Professeur)' : ''}</div>
+      ${student.handRaised ? '<div class="hand-icon">✋</div>' : ''}
+    `;
+    
+    list.appendChild(div);
+  });
+}
+
+// ============================================================================
+// LOCK MANAGEMENT
+// ============================================================================
+function updateLockStatus() {
+  const overlay = document.getElementById('lockedOverlay');
+  const lockDot = document.getElementById('lockDot');
+  const lockText = document.getElementById('lockText');
+  const lockBtn = document.getElementById('toggleLockBtn');
+  const lockBtnIcon = document.getElementById('lockBtnIcon');
+  const lockBtnText = document.getElementById('lockBtnText');
+  
+  if (isLocked) {
+    overlay.classList.add('active');
+    lockDot.className = 'status-dot status-locked';
+    lockText.textContent = 'Tableau verrouillé';
+    
+    if (isAdmin) {
+      lockBtn.className = 'admin-btn btn-unlock';
+      lockBtnIcon.textContent = '🔓';
+      lockBtnText.textContent = 'Déverrouiller tableau';
+    }
+  } else {
+    overlay.classList.remove('active');
+    lockDot.className = 'status-dot status-unlocked';
+    lockText.textContent = 'Tableau déverrouillé';
+    
+    if (isAdmin) {
+      lockBtn.className = 'admin-btn btn-lock';
+      lockBtnIcon.textContent = '🔒';
+      lockBtnText.textContent = 'Verrouiller tableau';
+    }
+  }
+}
+
+async function toggleLock() {
+  if (!isAdmin || !classCode) return;
+  
+  const newLockedState = !isLocked;
+  
+  try {
+    const response = await fetch(`${API_URL}/api/classroom/lock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        classCode,
+        clientId,
+        locked: newLockedState
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      isLocked = newLockedState;
+      updateLockStatus();
+      showToast(isLocked ? '🔒 Tableau verrouillé' : '🔓 Tableau déverrouillé');
+    }
+  } catch (error) {
+    console.error('Erreur toggleLock:', error);
+  }
+}
+
+async function toggleRaiseHand() {
+  if (isAdmin || !classCode) return;
+  
+  handRaised = !handRaised;
+  const btn = document.getElementById('raiseHandBtn');
+  
+  if (handRaised) {
+    btn.classList.add('active');
+  } else {
+    btn.classList.remove('active');
+  }
+  
+  try {
+    await fetch(`${API_URL}/api/classroom/raise-hand`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        classCode,
+        clientId,
+        userName,
+        raised: handRaised
+      })
+    });
+  } catch (error) {
+    console.error('Erreur raise hand:', error);
+  }
+}
+
+async function clearAllHands() {
+  if (!isAdmin || !classCode) return;
+  
+  try {
+    const response = await fetch(`${API_URL}/api/classroom/clear-hands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        classCode,
+        clientId
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showToast('✋ Toutes les mains baissées');
+    }
+  } catch (error) {
+    console.error('Erreur clear hands:', error);
+  }
+}
+
+// ============================================================================
+// DRAWING FUNCTIONS
+// ============================================================================
+function drawLine(x0, y0, x1, y1, color, size, toolType) {
+  ctx.globalAlpha = opacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  
+  if (toolType === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = size * 2;
+    ctx.strokeStyle = 'rgba(255,255,255,1)';
+  } else if (toolType === 'highlighter') {
+    ctx.globalAlpha = 0.3;
+    ctx.lineWidth = size * 3;
+    ctx.strokeStyle = color;
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.lineWidth = size;
+    ctx.strokeStyle = color;
+  }
+  
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+  
+  // Multi-brush effect
+  if (multibrush > 1 && toolType !== 'eraser') {
+    for (let i = 1; i < multibrush; i++) {
+      const angle = (i * 2 * Math.PI) / multibrush;
+      const offsetX = Math.cos(angle) * size * 0.8;
+      const offsetY = Math.sin(angle) * size * 0.8;
+      
+      ctx.beginPath();
+      ctx.moveTo(x0 + offsetX, y0 + offsetY);
+      ctx.lineTo(x1 + offsetX, y1 + offsetY);
+      ctx.stroke();
+    }
+  }
+  
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+async function sendDrawData(x0, y0, x1, y1) {
+  if (!classCode) return;
+  
+  try {
+    await fetch(`${API_URL}/api/classroom/draw`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        classCode,
+        clientId,
+        x0, y0, x1, y1,
+        color,
+        size,
+        tool
+      })
+    });
+  } catch (error) {
+    console.error('Erreur send draw:', error);
+  }
+}
+
+// ============================================================================
+// CANVAS EVENT HANDLERS
+// ============================================================================
+function startDrawing(e) {
+  if (isLocked && !isAdmin) return;
+  
+  drawing = true;
+  const pos = getMousePos(e);
+  lastX = pos.x;
+  lastY = pos.y;
+  
+  // Save state for undo
+  saveState(undoStack);
+  redoStack.length = 0;
+}
+
+function draw(e) {
+  if (!drawing || (isLocked && !isAdmin)) return;
+  
+  const pos = getMousePos(e);
+  const currentX = pos.x;
+  const currentY = pos.y;
+  
+  drawLine(lastX, lastY, currentX, currentY, color, size, tool);
+  sendDrawData(lastX, lastY, currentX, currentY);
+  
+  lastX = currentX;
+  lastY = currentY;
+}
+
+function stopDrawing() {
+  drawing = false;
+}
+
+function getMousePos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX || e.touches[0].clientX) - rect.left,
+    y: (e.clientY || e.touches[0].clientY) - rect.top
+  };
+}
+
+// ============================================================================
+// TOOL FUNCTIONS
+// ============================================================================
+function saveState(stack) {
+  stack.push(canvas.toDataURL());
+  if (stack.length > 20) stack.shift();
+}
+
+function undo() {
+  if (undoStack.length > 1) {
+    redoStack.push(undoStack.pop());
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+    };
+    img.src = undoStack[undoStack.length - 1];
+  }
+}
+
+function redo() {
+  if (redoStack.length > 0) {
+    const state = redoStack.pop();
+    undoStack.push(state);
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+    };
+    img.src = state;
+  }
+}
+
+async function clearCanvas() {
+  if (!classCode) return;
+  
+  try {
+    const response = await fetch(`${API_URL}/api/classroom/clear`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        classCode,
+        clientId
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      undoStack.length = 0;
+      redoStack.length = 0;
+      saveState(undoStack);
+      showToast('🗑️ Canvas effacé');
+    }
+  } catch (error) {
+    console.error('Erreur clear canvas:', error);
+  }
+}
+
+function saveCanvas() {
+  const link = document.createElement('a');
+  link.download = `whiteboard-${classCode}-${Date.now()}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+// ============================================================================
+// UI UPDATES
+// ============================================================================
+function updateCursor() {
+  if (tool === 'eraser') {
+    canvas.classList.add('eraser-cursor');
+    canvas.classList.remove('locked');
+  } else if (isLocked && !isAdmin) {
+    canvas.classList.add('locked');
+    canvas.classList.remove('eraser-cursor');
+  } else {
+    canvas.classList.remove('eraser-cursor', 'locked');
+  }
+}
+
+function showToast(message) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.remove();
+  }, 3000);
+}
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+function init() {
+  // Toolbar event listeners
+  document.getElementById('colorPicker').addEventListener('input', (e) => {
+    color = e.target.value;
+  });
+  
+  document.getElementById('brushSize').addEventListener('input', (e) => {
+    size = parseInt(e.target.value);
+    document.getElementById('sizeValue').textContent = size;
+  });
+  
+  document.getElementById('opacityRange').addEventListener('input', (e) => {
+    opacity = parseInt(e.target.value) / 100;
+    document.getElementById('opacityValue').textContent = e.target.value;
+  });
+  
+  document.getElementById('toolSelect').addEventListener('change', (e) => {
+    tool = e.target.value;
+    document.getElementById('textControls').style.display = 
+      tool === 'text' ? 'flex' : 'none';
+    updateCursor();
+  });
+  
+  document.getElementById('multibrushSelect').addEventListener('change', (e) => {
+    multibrush = parseInt(e.target.value);
+  });
+  
+  document.getElementById('undoBtn').addEventListener('click', undo);
+  document.getElementById('redoBtn').addEventListener('click', redo);
+  document.getElementById('clearBtn').addEventListener('click', clearCanvas);
+  document.getElementById('saveBtn').addEventListener('click', saveCanvas);
+  
+  // Canvas event listeners
+  canvas.addEventListener('mousedown', startDrawing);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDrawing);
+  canvas.addEventListener('mouseout', stopDrawing);
+  
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    startDrawing(e);
+  });
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    draw(e);
+  });
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    stopDrawing();
+  });
+  
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        redo();
+      }
+    }
+  });
+  
+  // Initial cursor update
+  updateCursor();
+}
+
+// Start the application
+window.onload = init;
+</script>
+</body>
+</html>
